@@ -3,6 +3,7 @@ import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 import math
 import numpy as np
 import pandas as pd
@@ -70,6 +71,7 @@ def fetch_scoreboard(selected_league, day):
         status = event.get("status", {}).get("type", {})
         rows.append({
             "Fecha (UTC)": event.get("date", ""),
+            "Estado técnico": status.get("name", ""),
             "Visitante": away.get("team", {}).get("displayName", ""),
             "Puntos visitante": away.get("score", "—"),
             "Local": home.get("team", {}).get("displayName", ""),
@@ -92,16 +94,37 @@ if section == "Mercado de partidos":
         if games.empty:
             st.info("Sin encuentros registrados en esta fecha. Selecciona otro día.")
         else:
-            completed = games["Estado"].astype(str).str.contains("Final",case=False,na=False).sum()
+            completed = games["Estado técnico"].astype(str).str.upper().eq("STATUS_FINAL").sum()
+            f1,f2 = st.columns(2)
+            with f1:
+                status_filter = st.selectbox("Estado", ["Todos", "Programados", "En vivo", "Finalizados"])
+            with f2:
+                team_filter = st.selectbox("Equipo", ["Todos"] + sorted(set(games["Local"]) | set(games["Visitante"])))
+            if team_filter != "Todos":
+                games = games[(games["Local"] == team_filter) | (games["Visitante"] == team_filter)]
+            if status_filter != "Todos":
+                names = games["Estado técnico"].astype(str).str.upper()
+                if status_filter == "Finalizados":
+                    games = games[names.eq("STATUS_FINAL")]
+                elif status_filter == "En vivo":
+                    games = games[names.isin(["STATUS_IN_PROGRESS", "STATUS_HALFTIME"])]
+                else:
+                    games = games[names.eq("STATUS_SCHEDULED")]
+            games = games.reset_index(drop=True)
             a,b = st.columns(2)
-            a.metric("Encuentros",len(games))
+            a.metric("Encuentros filtrados",len(games))
             b.metric("Finalizados",int(completed))
             st.markdown("#### Cartelera")
             for idx,game in games.iterrows():
                 with st.container(border=True):
                     st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
                     st.markdown(f"### {game['Puntos visitante']} – {game['Puntos local']}")
-                    st.caption(str(game["Estado"]))
+                    try:
+                        kickoff = pd.to_datetime(game["Fecha (UTC)"], utc=True).tz_convert(ZoneInfo("America/Mexico_City"))
+                        kickoff_label = kickoff.strftime("%d/%m · %H:%M CDMX")
+                    except (ValueError, TypeError):
+                        kickoff_label = "Horario no disponible"
+                    st.caption(kickoff_label + " · " + str(game["Estado"]))
                     with st.expander("Mercados y análisis"):
                         st.write("**Moneyline:** pendiente · **Spread:** pendiente · **Total:** pendiente")
                         st.caption("No se muestran líneas ficticias. Puedes usar el Analizador EV con cuotas verificadas o el Modelo histórico con datos reales.")
