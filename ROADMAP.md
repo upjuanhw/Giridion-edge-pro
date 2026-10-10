@@ -37,8 +37,8 @@ Dashboard móvil NFL/NCAAF inspirado en un mercado financiero y la cartelera de 
 - [ ] Auditoría de sesgos, estabilidad y reproducibilidad.
 
 ## Sprint 4 — mercado
-- [ ] Investigar acceso autorizado a cuotas Caliente y restricciones.
-- [ ] Si no hay acceso, flujo de importación manual cómodo y verificable.
+- [ ] Investigar acceso autorizado a cuotas Caliente y restricciones (revisión inicial: no se identificó API pública oficial; consultar autorización/proveedor).
+- [ ] Si no hay acceso, flujo de importación manual cómodo y verificable (formulario de captura Caliente y exportación CSV implementados; validación móvil pendiente).
 - [ ] Momios timestamp, vig/no-vig, movimiento de línea.
 - [ ] EV neto, ranking por valor y umbrales de confianza.
 - [ ] Alertas únicamente con fuentes y reglas verificadas.
