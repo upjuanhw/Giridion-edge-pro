@@ -307,6 +307,37 @@ elif section == "Cuotas CSV":
     st.subheader("Importar líneas capturadas")
     sample = pd.DataFrame([{"league":"NFL","game":"Equipo A vs Equipo B","market":"ML local","american_odds":-110,"captured_at":"2026-10-10T12:00:00-06:00"}])
     st.download_button("Descargar plantilla CSV", sample.to_csv(index=False).encode(), "plantilla_momios.csv", "text/csv")
+    st.markdown("#### Registrar momio de Caliente")
+    st.caption("Captura manual a partir de una cuota que hayas comprobado en Caliente. No es un feed en vivo ni accede a tu cuenta.")
+    with st.form("caliente_manual"):
+        game_name = st.text_input("Partido", placeholder="Pittsburgh Steelers @ Cleveland Browns")
+        market_name = st.selectbox("Mercado", ["ML local", "ML visitante", "Spread local", "Spread visitante", "Over", "Under"])
+        american = st.number_input("Momio americano", value=-110, step=5)
+        line = st.number_input("Línea (puntos, si aplica)", value=0.0, step=0.5)
+        captured = st.text_input("Fecha/hora de captura (ISO 8601 con zona)", value=pd.Timestamp.now(tz="America/Mexico_City").isoformat(timespec="seconds"))
+        submitted = st.form_submit_button("Añadir a mi registro")
+    if submitted:
+        try:
+            stamp = pd.Timestamp(captured)
+            if stamp.tzinfo is None:
+                raise ValueError("Incluye zona horaria, por ejemplo -06:00.")
+            if not game_name.strip() or american == 0 or abs(american) < 100:
+                raise ValueError("Indica un partido y un momio americano válido (mínimo ±100).")
+            row = {"league": league, "game": game_name.strip(), "market": market_name,
+                   "line": line if market_name.startswith(("Spread", "Over", "Under")) else None,
+                   "american_odds": int(american), "captured_at": stamp.isoformat(),
+                   "source": "Caliente (captura manual, sin verificación automática)"}
+            st.session_state.setdefault("manual_caliente", []).append(row)
+            st.success("Momio registrado en esta sesión. Descarga el CSV para conservarlo.")
+        except (ValueError, TypeError) as exc:
+            st.error(str(exc))
+    saved = pd.DataFrame(st.session_state.get("manual_caliente", []))
+    if not saved.empty:
+        st.dataframe(saved, hide_index=True, use_container_width=True)
+        st.download_button("Exportar mis momios Caliente", saved.to_csv(index=False).encode("utf-8"),
+                           "caliente_capturas.csv", mime="text/csv")
+        st.caption("El registro en memoria se pierde al reiniciar la sesión o el servidor; exporta el CSV.")
+    st.link_button("Consultar cuotas en Caliente ↗", "https://sports.caliente.mx/es_MX/Futbol-Americano")
     upload = st.file_uploader("Sube un CSV de cuotas", type=["csv"])
     if upload:
         try:
