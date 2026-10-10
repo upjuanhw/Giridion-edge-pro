@@ -22,9 +22,9 @@ div[data-testid="stMetricLabel"] {color:#a5b9ce;}
 .stButton button {border-radius:9px;font-weight:700;border:1px solid #31465c;}
 [data-testid="stDataFrame"] {border:1px solid #2a3d51;border-radius:12px;overflow:hidden;}
 div[data-testid="stAlert"] {border-radius:10px;}
-.edge-hero {padding:18px 20px;border:1px solid #31465b;border-radius:14px;background:linear-gradient(110deg,#13243a,#101a28);margin-bottom:18px;}
+.edge-hero {padding:10px 14px;border:1px solid #31465b;border-radius:14px;background:linear-gradient(110deg,#13243a,#101a28);margin-bottom:8px;}
 .edge-kicker {font-size:11px;font-weight:800;letter-spacing:.18em;color:#3ce0b0;}
-.edge-headline {font-size:clamp(22px,4vw,34px);font-weight:850;color:#f4f8ff;letter-spacing:-.04em;}
+.edge-headline {font-size:clamp(20px,3vw,27px);font-weight:850;color:#f4f8ff;letter-spacing:-.04em;}
 .edge-sub {font-size:13px;color:#b4c6d9;}
 .edge-tag {display:inline-block;padding:4px 9px;border:1px solid #3a5369;border-radius:6px;color:#c7d8e9;font-size:11px;font-weight:700;margin-top:10px;}
 @media(max-width:650px) {.block-container {padding-left:.8rem;padding-right:.8rem;} .edge-hero{padding:15px;}}
@@ -34,15 +34,18 @@ div[data-testid="stAlert"] {border-radius:10px;}
 with st.sidebar:
     st.title("🏈 GRIDIRON EDGE")
     st.caption("PRO • NFL / NCAA")
-    league = st.radio("Liga", ["NFL", "NCAAF"], horizontal=True)
-    section = st.radio("Panel", ["Mercado de partidos", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
+    st.caption("La navegación principal está siempre visible arriba.")
     st.divider()
     st.caption("Versión beta • Marcadores ESPN (fuente pública no oficial); momios no conectados")
 
+# Mobile-first navigation: always visible, with games as the default.
+league = st.segmented_control("Liga", ["NFL", "NCAAF"], default="NFL", key="league_top")
+labels = ["Partidos", "Modelo", "EV", "Monte Carlo", "Cuotas", "Configuración"]
+selection = st.selectbox("Vista", labels, index=0, key="view_top")
+section = dict(zip(labels, ["Mercado de partidos", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"]))[selection]
 st.markdown(f"""<div class="edge-hero"><div class="edge-kicker">GRIDIRON EDGE PRO / {league}</div>
-<div class="edge-headline">Mercado & análisis de partidos</div>
-<div class="edge-sub">NFL · NCAA · Marcadores · Probabilidades · Valor esperado</div>
-<div class="edge-tag">DATOS ESPN · CUOTAS CALIENTE NO CONECTADAS</div></div>""",unsafe_allow_html=True)
+<div class="edge-headline">Football Market Terminal</div>
+<div class="edge-sub">Partidos · Estadística · Modelos · Valor esperado</div></div>""",unsafe_allow_html=True)
 
 def decimal_odds(american):
     return 1 + american/100 if american > 0 else 1 + 100/abs(american) if american < 0 else None
@@ -77,8 +80,7 @@ def fetch_scoreboard(selected_league, day):
     return pd.DataFrame(rows)
 
 if section == "Mercado de partidos":
-    st.subheader(f"Mercado de partidos · {league}")
-    st.caption("Panel de partidos inspirado en una terminal financiera deportiva. Resultados ESPN (fuente pública no oficial). Los momios y probabilidades del mercado aún no están conectados.")
+    st.caption("Marcadores ESPN · caché 5 min · Cuotas Caliente pendientes")
     a,b = st.columns([2,1])
     with a:
         day = st.date_input("Jornada / fecha", value=date.today(), min_value=date(2020,1,1), max_value=date.today()+timedelta(days=365))
@@ -91,19 +93,15 @@ if section == "Mercado de partidos":
             st.info("Sin encuentros registrados en esta fecha. Selecciona otro día.")
         else:
             completed = games["Estado"].astype(str).str.contains("Final",case=False,na=False).sum()
-            a,b,c = st.columns(3)
+            a,b = st.columns(2)
             a.metric("Encuentros",len(games))
             b.metric("Finalizados",int(completed))
-            c.metric("Cuotas en vivo","No conectadas")
             st.markdown("#### Cartelera")
             for idx,game in games.iterrows():
                 with st.container(border=True):
-                    left,right=st.columns([3,1])
-                    with left:
-                        st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
-                        st.caption(str(game["Estado"]))
-                    with right:
-                        st.markdown(f"### {game['Puntos visitante']} – {game['Puntos local']}")
+                    st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
+                    st.markdown(f"### {game['Puntos visitante']} – {game['Puntos local']}")
+                    st.caption(str(game["Estado"]))
                     with st.expander("Mercados y análisis"):
                         st.write("**Moneyline:** pendiente · **Spread:** pendiente · **Total:** pendiente")
                         st.caption("No se muestran líneas ficticias. Puedes usar el Analizador EV con cuotas verificadas o el Modelo histórico con datos reales.")
@@ -271,7 +269,7 @@ elif section == "Cuotas CSV":
 
 else:
     st.subheader("Integraciones y validación")
-    st.dataframe(pd.DataFrame([
+    status_rows = pd.DataFrame([
         {"Componente":"Dashboard web","Estado":"Implementado"},
         {"Componente":"Cálculo EV","Estado":"Implementado"},
         {"Componente":"Monte Carlo exploratorio","Estado":"Implementado (sin calibración)"},
@@ -282,5 +280,9 @@ else:
         {"Componente":"Históricos ESPN por temporada","Estado":"Consulta pública integrada; cobertura no garantizada"},
         {"Componente":"Modelo histórico + backtesting cronológico","Estado":"Baseline experimental; sin validación externa"},
         {"Componente":"Despliegue público","Estado":"Render activo"},
-    ]), hide_index=True, use_container_width=True)
+    ])
+    for _, item in status_rows.iterrows():
+        with st.container(border=True):
+            st.markdown(f"**{item['Componente']}**")
+            st.caption(item["Estado"])
     st.caption("No almacenar credenciales en el repositorio. Usar secretos del proveedor de hosting.")
