@@ -72,6 +72,10 @@ def fetch_scoreboard(selected_league, day):
         rows.append({
             "Fecha (UTC)": event.get("date", ""),
             "Estado técnico": status.get("name", ""),
+            "Récord visitante": (away.get("records") or [{}])[0].get("summary", "N/D"),
+            "Récord local": (home.get("records") or [{}])[0].get("summary", "N/D"),
+            "Abreviatura visitante": away.get("team", {}).get("abbreviation", ""),
+            "Abreviatura local": home.get("team", {}).get("abbreviation", ""),
             "Visitante": away.get("team", {}).get("displayName", ""),
             "Puntos visitante": away.get("score", "—"),
             "Local": home.get("team", {}).get("displayName", ""),
@@ -118,14 +122,25 @@ if section == "Mercado de partidos":
             for idx,game in games.iterrows():
                 with st.container(border=True):
                     st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
-                    st.markdown(f"### {game['Puntos visitante']} – {game['Puntos local']}")
+                    c1,c2,c3 = st.columns([2,1,2])
+                    with c1:
+                        st.markdown(f"### {game['Abreviatura visitante'] or 'VIS'}")
+                        st.caption("Visitante · " + str(game["Récord visitante"]))
+                    with c2:
+                        st.markdown(f"### {game['Puntos visitante']} : {game['Puntos local']}")
+                    with c3:
+                        st.markdown(f"### {game['Abreviatura local'] or 'LOC'}")
+                        st.caption("Local · " + str(game["Récord local"]))
                     try:
                         kickoff = pd.to_datetime(game["Fecha (UTC)"], utc=True).tz_convert(ZoneInfo("America/Mexico_City"))
                         kickoff_label = kickoff.strftime("%d/%m · %H:%M CDMX")
                     except (ValueError, TypeError):
                         kickoff_label = "Horario no disponible"
                     st.caption(kickoff_label + " · " + str(game["Estado"]))
-                    with st.expander("Mercados y análisis"):
+                    with st.expander("Ficha del partido · estadísticas y mercados"):
+                        st.markdown("**Comparación de equipos**")
+                        st.write("Récord visitante: " + str(game["Récord visitante"]) + " · Récord local: " + str(game["Récord local"]))
+                        st.caption("Récord provisto por ESPN cuando está disponible; no es una calificación predictiva.")
                         st.write("**Moneyline:** pendiente · **Spread:** pendiente · **Total:** pendiente")
                         st.caption("No se muestran líneas ficticias. Puedes usar el Analizador EV con cuotas verificadas o el Modelo histórico con datos reales.")
                         if game["ESPN"]:
