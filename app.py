@@ -8,16 +8,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Gridiron Edge Pro", page_icon="🏈", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Gridiron Edge Pro", page_icon="🏈", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""
 <style>
-.stApp {background: #0b1220; color: #e7edf7;}
-[data-testid="stSidebar"] {background: #111d31;}
-.block-container {padding-top: 1.6rem; max-width: 1500px;}
-h1,h2,h3 {letter-spacing:-.03em;}
-div[data-testid="stMetric"] {background:#17253b;border:1px solid #30445f;border-radius:14px;padding:14px;}
-div[data-testid="stMetricLabel"] {color:#b8c8df;}
-.stButton button {border-radius:12px;}
+:root {--ink:#090e16;--panel:#111b29;--edge:#27374b;--accent:#20c997;}
+.stApp {background:linear-gradient(145deg,#090e16,#0c1623 65%,#0b1019);color:#edf4fb;}
+[data-testid="stSidebar"] {background:#101b2a;border-right:1px solid #24354a;}
+.block-container {padding-top:1.1rem;padding-bottom:3rem;max-width:1450px;}
+h1,h2,h3 {letter-spacing:-.035em;}
+h1 {font-weight:850!important;}
+div[data-testid="stMetric"] {background:#121f30;border:1px solid #2b3c50;border-radius:12px;padding:13px;}
+div[data-testid="stMetricLabel"] {color:#a5b9ce;}
+.stButton button {border-radius:9px;font-weight:700;border:1px solid #31465c;}
+[data-testid="stDataFrame"] {border:1px solid #2a3d51;border-radius:12px;overflow:hidden;}
+div[data-testid="stAlert"] {border-radius:10px;}
+.edge-hero {padding:18px 20px;border:1px solid #31465b;border-radius:14px;background:linear-gradient(110deg,#13243a,#101a28);margin-bottom:18px;}
+.edge-kicker {font-size:11px;font-weight:800;letter-spacing:.18em;color:#3ce0b0;}
+.edge-headline {font-size:clamp(22px,4vw,34px);font-weight:850;color:#f4f8ff;letter-spacing:-.04em;}
+.edge-sub {font-size:13px;color:#b4c6d9;}
+.edge-tag {display:inline-block;padding:4px 9px;border:1px solid #3a5369;border-radius:6px;color:#c7d8e9;font-size:11px;font-weight:700;margin-top:10px;}
+@media(max-width:650px) {.block-container {padding-left:.8rem;padding-right:.8rem;} .edge-hero{padding:15px;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -25,13 +35,14 @@ with st.sidebar:
     st.title("🏈 GRIDIRON EDGE")
     st.caption("PRO • NFL / NCAA")
     league = st.radio("Liga", ["NFL", "NCAAF"], horizontal=True)
-    section = st.radio("Panel", ["Resumen", "Partidos y resultados", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
+    section = st.radio("Panel", ["Mercado de partidos", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
     st.divider()
     st.caption("Versión beta • Marcadores ESPN (fuente pública no oficial); momios no conectados")
 
-st.title("Gridiron Edge Pro")
-st.caption(f"{league}  /  Análisis cuantitativo  /  Sin señales automáticas de apuestas")
-st.warning("Las cuotas y probabilidades deben verificarse. Marcadores de ESPN disponibles como fuente pública no oficial; no hay conexión a Caliente ni modelo entrenado y validado.", icon="⚠️")
+st.markdown(f"""<div class="edge-hero"><div class="edge-kicker">GRIDIRON EDGE PRO / {league}</div>
+<div class="edge-headline">Mercado & análisis de partidos</div>
+<div class="edge-sub">NFL · NCAA · Marcadores · Probabilidades · Valor esperado</div>
+<div class="edge-tag">DATOS ESPN · CUOTAS CALIENTE NO CONECTADAS</div></div>""",unsafe_allow_html=True)
 
 def decimal_odds(american):
     return 1 + american/100 if american > 0 else 1 + 100/abs(american) if american < 0 else None
@@ -65,35 +76,44 @@ def fetch_scoreboard(selected_league, day):
         })
     return pd.DataFrame(rows)
 
-if section == "Resumen":
-    a,b,c,d = st.columns(4)
-    a.metric("Ligas", "2", "NFL + NCAAF")
-    b.metric("Calculadora EV", "Activa")
-    c.metric("Simulador", "Disponible")
-    d.metric("Momios en vivo", "Pendiente")
-    st.subheader("Centro de análisis")
-    st.write("Analiza la probabilidad de equilibrio de cada momio, calcula valor esperado y simula marcadores con supuestos transparentes. Importa tus propias líneas en CSV.")
-    st.info("Esta versión no emite picks calibrados ni simula acceso en tiempo real a casas de apuestas.")
-
-elif section == "Partidos y resultados":
-    st.subheader(f"Partidos y resultados • {league}")
-    st.caption("Fuente: marcador público de ESPN. Actualización de caché cada 5 minutos. No es un feed oficial contratado, puede cambiar o dejar de funcionar.")
-    day = st.date_input("Fecha de los partidos", value=date.today(), min_value=date(2020, 1, 1), max_value=date.today() + timedelta(days=365))
-    if st.button("Actualizar marcadores"):
-        fetch_scoreboard.clear()
+if section == "Mercado de partidos":
+    st.subheader(f"Mercado de partidos · {league}")
+    st.caption("Panel de partidos inspirado en una terminal financiera deportiva. Resultados ESPN (fuente pública no oficial). Los momios y probabilidades del mercado aún no están conectados.")
+    a,b = st.columns([2,1])
+    with a:
+        day = st.date_input("Jornada / fecha", value=date.today(), min_value=date(2020,1,1), max_value=date.today()+timedelta(days=365))
+    with b:
+        if st.button("↻ Actualizar partidos", use_container_width=True):
+            fetch_scoreboard.clear()
     try:
         games = fetch_scoreboard(league, day)
         if games.empty:
-            st.info("No se encontraron partidos para esa fecha. Prueba otro día.")
+            st.info("Sin encuentros registrados en esta fecha. Selecciona otro día.")
         else:
-            st.metric("Partidos encontrados", len(games))
-            st.dataframe(games, hide_index=True, use_container_width=True,
-                         column_config={"ESPN": st.column_config.LinkColumn("Ficha ESPN", display_text="Ver partido")})
-        st.caption("Fechas mostradas en UTC. Los resultados no incluyen líneas de Caliente ni probabilidades calculadas.")
+            completed = games["Estado"].astype(str).str.contains("Final",case=False,na=False).sum()
+            a,b,c = st.columns(3)
+            a.metric("Encuentros",len(games))
+            b.metric("Finalizados",int(completed))
+            c.metric("Cuotas en vivo","No conectadas")
+            st.markdown("#### Cartelera")
+            for idx,game in games.iterrows():
+                with st.container(border=True):
+                    left,right=st.columns([3,1])
+                    with left:
+                        st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
+                        st.caption(str(game["Estado"]))
+                    with right:
+                        st.markdown(f"### {game['Puntos visitante']} – {game['Puntos local']}")
+                    with st.expander("Mercados y análisis"):
+                        st.write("**Moneyline:** pendiente · **Spread:** pendiente · **Total:** pendiente")
+                        st.caption("No se muestran líneas ficticias. Puedes usar el Analizador EV con cuotas verificadas o el Modelo histórico con datos reales.")
+                        if game["ESPN"]:
+                            st.link_button("Ficha del encuentro en ESPN ↗",game["ESPN"])
     except (requests.RequestException, ValueError, KeyError) as exc:
-        st.error("No se pudo consultar ESPN en este momento. Intenta de nuevo más tarde.")
-        st.caption(f"Detalle técnico: {type(exc).__name__}")
-        
+        st.error("No se pudieron obtener los encuentros. Intenta actualizar.")
+        st.caption(type(exc).__name__)
+    st.caption("Actualización en caché: 5 min · Marcadores ESPN sujetos a disponibilidad. No son probabilidades ni cuotas de Caliente.")
+
 elif section == "Modelo histórico":
     st.subheader(f"Modelo histórico y backtesting • {league}")
     st.info("Baseline experimental: medias de puntos a favor/en contra suavizadas, ventaja local manual y Monte Carlo. No incorpora lesiones, fuerza de calendario ni momios. No está calibrado para apostar.")
