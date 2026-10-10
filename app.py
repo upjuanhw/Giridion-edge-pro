@@ -73,6 +73,8 @@ def fetch_scoreboard(selected_league, day):
             "Fecha (UTC)": event.get("date", ""),
             "Estado técnico": status.get("name", ""),
             "Récord visitante": (away.get("records") or [{}])[0].get("summary", "N/D"),
+            "Logo visitante": away.get("team", {}).get("logo", ""),
+            "Logo local": home.get("team", {}).get("logo", ""),
             "Récord local": (home.get("records") or [{}])[0].get("summary", "N/D"),
             "Abreviatura visitante": away.get("team", {}).get("abbreviation", ""),
             "Abreviatura local": home.get("team", {}).get("abbreviation", ""),
@@ -124,11 +126,15 @@ if section == "Mercado de partidos":
                     st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
                     c1,c2,c3 = st.columns([2,1,2])
                     with c1:
+                        if str(game["Logo visitante"]).startswith("https://"):
+                            st.image(game["Logo visitante"], width=42)
                         st.markdown(f"### {game['Abreviatura visitante'] or 'VIS'}")
                         st.caption("Visitante · " + str(game["Récord visitante"]))
                     with c2:
                         st.markdown(f"### {game['Puntos visitante']} : {game['Puntos local']}")
                     with c3:
+                        if str(game["Logo local"]).startswith("https://"):
+                            st.image(game["Logo local"], width=42)
                         st.markdown(f"### {game['Abreviatura local'] or 'LOC'}")
                         st.caption("Local · " + str(game["Récord local"]))
                     try:
