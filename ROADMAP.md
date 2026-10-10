@@ -15,10 +15,10 @@ Dashboard móvil NFL/NCAAF inspirado en un mercado financiero y la cartelera de 
 
 ## Sprint 1 — interfaz y confiabilidad
 - [x] Filtros por fecha, estado y equipo; horarios locales de México.
-- [ ] Tarjetas con escudos (récord, estado y marcador implementados; escudos pendientes).
+- [ ] Tarjetas con escudos (escudos ESPN implementados cuando están disponibles; validación visual móvil pendiente).
 - [ ] Vista detallada completa (ficha desplegable con récord y enlace ESPN implementada; estadísticas avanzadas pendientes).
-- [ ] Comprobaciones de integridad de ESPN: conteos, duplicados, fechas, resultados.
-- [ ] Pruebas unitarias para parsing y probabilidades.
+- [ ] Comprobaciones de integridad de ESPN (auditoría de filas, duplicados, fechas, resultados implementada; cobertura semanal completa pendiente).
+- [ ] Pruebas unitarias para parsing y probabilidades (primeros casos escritos y conectados a CI; ejecución exitosa pendiente de verificar).
 - [ ] Prueba visual Android y rendimiento.
 
 ## Sprint 2 — calidad de datos
