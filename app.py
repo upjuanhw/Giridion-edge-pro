@@ -1,6 +1,7 @@
 import io
 import requests
 from historical_model import clean_games, predict, backtest
+from season_data import fetch_season
 from datetime import date, timedelta
 import math
 import numpy as np
@@ -96,16 +97,46 @@ elif section == "Partidos y resultados":
 elif section == "Modelo histórico":
     st.subheader(f"Modelo histórico y backtesting • {league}")
     st.info("Baseline experimental: medias de puntos a favor/en contra suavizadas, ventaja local manual y Monte Carlo. No incorpora lesiones, fuerza de calendario ni momios. No está calibrado para apostar.")
-    st.write("Carga un CSV de partidos **finalizados** de una misma liga, con columnas: date, home, away, home_score, away_score. No mezcles NFL y NCAAF.")
+    st.write("Usa una temporada de resultados públicos de ESPN o carga un CSV de partidos finalizados de una sola liga.")
+    @st.cache_data(ttl=86400, show_spinner=False)
+    def season_history(selected_league, year):
+        return fetch_season(selected_league, year)
+    source = st.radio("Origen del histórico", ["ESPN (automático)", "CSV propio"], horizontal=True)
+    history = None
+    if source == "ESPN (automático)":
+        year = st.selectbox("Temporada regular", list(range(2025, 2019, -1)))
+        if st.button("Cargar temporada ESPN"):
+            with st.spinner("Consultando resultados semanales de ESPN..."):
+                try:
+                    raw, failures = season_history(league, year)
+                    st.session_state["season_history"] = raw
+                    st.session_state["season_key"] = (league, year)
+                    st.session_state["season_failures"] = failures
+                except (ValueError, requests.RequestException) as exc:
+                    st.error(f"No fue posible descargar la temporada: {exc}")
+        if st.session_state.get("season_key") == (league, year):
+            history = st.session_state["season_history"]
+            failures = st.session_state.get("season_failures", 0)
+            st.caption(f"Temporada {year} • Fuente pública ESPN, no oficial • Semanas con errores: {failures}. La cobertura puede ser incompleta.")
+            if failures:
+                st.warning("Faltaron algunas semanas: evita interpretar el modelo como validado con la temporada completa.")
+            st.download_button("Descargar histórico obtenido", history.to_csv(index=False), f"{league}_{year}_espn.csv", "text/csv")
+    else:
+        st.caption("Columnas CSV: date, home, away, home_score, away_score. No mezcles NFL y NCAAF.")
     example = pd.DataFrame([
         {"date":"2025-09-07","home":"Equipo A","away":"Equipo B","home_score":27,"away_score":20},
         {"date":"2025-09-14","home":"Equipo B","away":"Equipo A","home_score":17,"away_score":24},
     ])
     st.download_button("Plantilla de resultados", example.to_csv(index=False), "resultados_historicos.csv", "text/csv")
-    upload = st.file_uploader("Histórico CSV", type=["csv"], key="history")
-    if upload:
+    upload = st.file_uploader("Histórico CSV", type=["csv"], key="history") if source == "CSV propio" else None
+    if upload is not None:
         try:
             history = clean_games(pd.read_csv(upload))
+        except (ValueError, pd.errors.ParserError) as exc:
+            st.error(f"Error al leer el archivo: {exc}")
+    if history is not None:
+        try:
+            history = clean_games(history)
             if len(history) < 10:
                 st.warning("Se requieren al menos 10 juegos finalizados para empezar a explorar; para backtesting hacen falta más.")
             else:
@@ -228,7 +259,8 @@ else:
         {"Componente":"Marcadores NFL/NCAAF (ESPN público)","Estado":"Integrado (no oficial; requiere verificación)"},
         {"Componente":"Estadísticas avanzadas / lesiones","Estado":"Pendiente"},
         {"Componente":"Feed de cuotas Caliente","Estado":"Pendiente / sujeto a acceso permitido"},
-        {"Componente":"Modelo histórico CSV + backtesting cronológico","Estado":"Baseline experimental implementado; sin validación externa"},
+        {"Componente":"Históricos ESPN por temporada","Estado":"Consulta pública integrada; cobertura no garantizada"},
+        {"Componente":"Modelo histórico + backtesting cronológico","Estado":"Baseline experimental; sin validación externa"},
         {"Componente":"Despliegue público","Estado":"Render activo"},
     ]), hide_index=True, use_container_width=True)
     st.caption("No almacenar credenciales en el repositorio. Usar secretos del proveedor de hosting.")
