@@ -2,6 +2,7 @@ import io
 import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
+from data_quality import audit_games, is_clean
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 import math
@@ -198,12 +199,24 @@ elif section == "Modelo histórico":
             st.error(f"Error al leer el archivo: {exc}")
     if history is not None:
         try:
+            audit = audit_games(history)
+            with st.expander("Auditoría de integridad del histórico"):
+                st.write("Registros:", audit["rows"])
+                st.write("Fechas inválidas:", audit["invalid_dates"])
+                st.write("Marcadores inválidos:", audit["invalid_scores"])
+                st.write("Equipos faltantes / idénticos:", audit["missing_teams"])
+                st.write("Duplicados por fecha y equipos:", audit["duplicate_matchups"])
+                if "event_id" in history.columns:
+                    st.write("IDs duplicados:", audit["duplicate_ids"])
+            if not is_clean(audit):
+                st.error("El histórico presenta problemas de integridad. Corrige el origen antes de ejecutar el modelo.")
+                st.stop()
             history = clean_games(history)
             if len(history) < 10:
                 st.warning("Se requieren al menos 10 juegos finalizados para empezar a explorar; para backtesting hacen falta más.")
             else:
                 st.metric("Partidos válidos", len(history))
-                st.caption(f"Período: {history.date.min().date()} a {history.date.max().date()}. Los datos provienen exclusivamente del archivo cargado.")
+                st.caption(f"Período: {history.date.min().date()} a {history.date.max().date()}. Fuente: {source}. Cobertura e integridad sujetas a revisión.")
                 teams = sorted(set(history.home) | set(history.away))
                 a, b = st.columns(2)
                 with a: home_team = st.selectbox("Equipo local", teams)
