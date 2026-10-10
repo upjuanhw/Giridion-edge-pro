@@ -25,6 +25,22 @@ class DataQualityTests(unittest.TestCase):
         self.assertEqual(findings["invalid_scores"], 1)
         self.assertEqual(findings["invalid_dates"], 1)
 
+    def test_fractional_score_is_rejected(self):
+        data = self.games.copy()
+        data.loc[0, "home_score"] = 20.5
+        self.assertEqual(audit_games(data)["invalid_scores"], 1)
+        self.assertEqual(len(clean_games(data)), 1)
+
+    def test_same_kickoff_is_not_training_data(self):
+        from historical_model import backtest
+        dates = ["2025-09-01"] * 35
+        data = pd.DataFrame([
+            {"date": dates[i], "home": "A" if i % 2 == 0 else "B",
+             "away": "B" if i % 2 == 0 else "A",
+             "home_score": 20, "away_score": 17} for i in range(35)
+        ])
+        self.assertTrue(backtest(clean_games(data), min_history=30).empty)
+
     def test_missing_columns(self):
         with self.assertRaises(ValueError):
             audit_games(pd.DataFrame({"home": ["A"]}))
