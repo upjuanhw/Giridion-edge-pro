@@ -17,6 +17,7 @@ def clean_games(df):
     out = out.dropna(subset=["date", "home_score", "away_score"])
     out = out[(out.home != "") & (out.away != "") & (out.home != out.away)]
     out = out[(out.home_score >= 0) & (out.away_score >= 0)]
+    out = out[(out.home_score % 1 == 0) & (out.away_score % 1 == 0)]
     return out.sort_values("date").reset_index(drop=True)
 
 def team_profile(games, team, baseline=23.0, shrink=5):
@@ -57,7 +58,7 @@ def backtest(games, min_history=30):
     ordered = games.sort_values("date").reset_index(drop=True)
     for i in range(min_history, len(ordered)):
         game = ordered.iloc[i]
-        training = ordered.iloc[:i]
+        training = ordered[ordered.date < game.date]  # No same-kickoff look-ahead
         if (training.home.eq(game.home) | training.away.eq(game.home)).sum() < 3:
             continue
         if (training.home.eq(game.away) | training.away.eq(game.away)).sum() < 3:
