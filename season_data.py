@@ -29,6 +29,7 @@ def fetch_season(league, year):
                 except (KeyError, ValueError, TypeError):
                     continue
                 rows[str(event.get("id", ""))] = {
+                    "event_id": str(event.get("id", "")),
                     "date": event.get("date"), "home": home.get("team", {}).get("displayName", ""),
                     "away": away.get("team", {}).get("displayName", ""),
                     "home_score": hs, "away_score": vs,
