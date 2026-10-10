@@ -3,6 +3,7 @@ import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
 from data_quality import audit_games, is_clean
+from odds_provider import fetch_odds
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 import math
@@ -307,6 +308,32 @@ elif section == "Cuotas CSV":
     st.subheader("Importar líneas capturadas")
     sample = pd.DataFrame([{"league":"NFL","game":"Equipo A vs Equipo B","market":"ML local","american_odds":-110,"captured_at":"2026-10-10T12:00:00-06:00"}])
     st.download_button("Descargar plantilla CSV", sample.to_csv(index=False).encode(), "plantilla_momios.csv", "text/csv")
+    st.markdown("#### Momios publicados · NFL / NCAAF")
+    st.caption("Proveedor independiente TheOddsAPI; las cuotas NO son de Caliente. Requiere clave de acceso y plan compatible.")
+    try:
+        provider_key = st.secrets.get("THEODDSAPI_KEY", "")
+    except (FileNotFoundError, KeyError):
+        provider_key = ""
+    if provider_key:
+        @st.cache_data(ttl=900, show_spinner=False)
+        def provider_prices(selected_league, key):
+            return fetch_odds(selected_league, key)
+        if st.button("Actualizar momios publicados"):
+            provider_prices.clear()
+        try:
+            market_rows = provider_prices(league, provider_key)
+            if market_rows.empty:
+                st.info("El proveedor no reporta mercados disponibles para esta liga.")
+            else:
+                st.dataframe(market_rows, hide_index=True, use_container_width=True)
+                st.download_button("Exportar cuotas publicadas", market_rows.to_csv(index=False).encode(),
+                                   "cuotas_proveedor.csv", mime="text/csv")
+        except requests.RequestException as exc:
+            st.warning("No se pudieron consultar cuotas. Comprueba el plan, la clave y la disponibilidad del proveedor.")
+            st.caption(type(exc).__name__)
+    else:
+        st.info("Feed preparado, aún sin clave. Configura THEODDSAPI_KEY en los secretos de Render; no la incluyas en GitHub.")
+        st.link_button("Obtener clave del proveedor ↗", "https://theoddsapi.com/pricing")
     st.markdown("#### Registrar momio de Caliente")
     st.caption("Captura manual a partir de una cuota que hayas comprobado en Caliente. No es un feed en vivo ni accede a tu cuenta.")
     with st.form("caliente_manual"):
