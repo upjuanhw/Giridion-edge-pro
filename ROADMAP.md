@@ -14,9 +14,9 @@ Dashboard móvil NFL/NCAAF inspirado en un mercado financiero y la cartelera de 
 - [x] Carga de temporadas ESPN implementada (integridad aún sin auditar).
 
 ## Sprint 1 — interfaz y confiabilidad
-- [ ] Filtros por jornada, estado, equipo y horario local de México.
-- [ ] Tarjetas de partidos con escudos, récord, estado y marcador.
-- [ ] Vista detallada de un partido sin navegación técnica.
+- [x] Filtros por fecha, estado y equipo; horarios locales de México.
+- [ ] Tarjetas con escudos (récord, estado y marcador implementados; escudos pendientes).
+- [ ] Vista detallada completa (ficha desplegable con récord y enlace ESPN implementada; estadísticas avanzadas pendientes).
 - [ ] Comprobaciones de integridad de ESPN: conteos, duplicados, fechas, resultados.
 - [ ] Pruebas unitarias para parsing y probabilidades.
 - [ ] Prueba visual Android y rendimiento.
