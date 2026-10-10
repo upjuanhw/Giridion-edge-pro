@@ -1,5 +1,6 @@
 import io
 import requests
+from historical_model import clean_games, predict, backtest
 from datetime import date, timedelta
 import math
 import numpy as np
@@ -23,7 +24,7 @@ with st.sidebar:
     st.title("🏈 GRIDIRON EDGE")
     st.caption("PRO • NFL / NCAA")
     league = st.radio("Liga", ["NFL", "NCAAF"], horizontal=True)
-    section = st.radio("Panel", ["Resumen", "Partidos y resultados", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
+    section = st.radio("Panel", ["Resumen", "Partidos y resultados", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
     st.divider()
     st.caption("Versión beta • Marcadores ESPN (fuente pública no oficial); momios no conectados")
 
@@ -92,6 +93,62 @@ elif section == "Partidos y resultados":
         st.error("No se pudo consultar ESPN en este momento. Intenta de nuevo más tarde.")
         st.caption(f"Detalle técnico: {type(exc).__name__}")
         
+elif section == "Modelo histórico":
+    st.subheader(f"Modelo histórico y backtesting • {league}")
+    st.info("Baseline experimental: medias de puntos a favor/en contra suavizadas, ventaja local manual y Monte Carlo. No incorpora lesiones, fuerza de calendario ni momios. No está calibrado para apostar.")
+    st.write("Carga un CSV de partidos **finalizados** de una misma liga, con columnas: date, home, away, home_score, away_score. No mezcles NFL y NCAAF.")
+    example = pd.DataFrame([
+        {"date":"2025-09-07","home":"Equipo A","away":"Equipo B","home_score":27,"away_score":20},
+        {"date":"2025-09-14","home":"Equipo B","away":"Equipo A","home_score":17,"away_score":24},
+    ])
+    st.download_button("Plantilla de resultados", example.to_csv(index=False), "resultados_historicos.csv", "text/csv")
+    upload = st.file_uploader("Histórico CSV", type=["csv"], key="history")
+    if upload:
+        try:
+            history = clean_games(pd.read_csv(upload))
+            if len(history) < 10:
+                st.warning("Se requieren al menos 10 juegos finalizados para empezar a explorar; para backtesting hacen falta más.")
+            else:
+                st.metric("Partidos válidos", len(history))
+                st.caption(f"Período: {history.date.min().date()} a {history.date.max().date()}. Los datos provienen exclusivamente del archivo cargado.")
+                teams = sorted(set(history.home) | set(history.away))
+                a, b = st.columns(2)
+                with a: home_team = st.selectbox("Equipo local", teams)
+                with b: away_team = st.selectbox("Equipo visitante", teams, index=min(1,len(teams)-1))
+                a, b = st.columns(2)
+                with a: home_adv = st.number_input("Ventaja local (puntos)", -10.0, 10.0, 1.5, 0.5)
+                with b: sd = st.number_input("Volatilidad de puntos", 3.0, 25.0, 10.5, 0.5)
+                if home_team != away_team:
+                    model = predict(history, home_team, away_team, home_adv, sd)
+                    a, b, c = st.columns(3)
+                    a.metric(f"{home_team} ML (modelo)", f"{model['home_win']*100:.1f}%")
+                    b.metric(f"{away_team} ML (modelo)", f"{model['away_win']*100:.1f}%")
+                    c.metric("Total esperado", f"{model['total']:.1f}")
+                    st.write(f"Marcador medio: {home_team} {model['home_mean']:.1f} – {away_team} {model['away_mean']:.1f}")
+                    st.caption(f"Juegos usados: {home_team} {model['home_games']}; {away_team} {model['away_games']}. Empates simulados: {model['tie']*100:.1f}%. No incluye prórroga.")
+                    line = st.number_input("Línea total a comparar", 0.0, 120.0, 45.5, 0.5)
+                    spread = st.number_input("Spread local a comparar", -50.0, 50.0, -3.5, 0.5)
+                    hs, vs = model["home_scores"], model["away_scores"]
+                    st.write(f"Over {line}: **{np.mean(hs+vs>line)*100:.1f}%** · Local cubre {spread:+g}: **{np.mean(hs+spread>vs)*100:.1f}%**")
+                else:
+                    st.warning("Elige dos equipos distintos.")
+                st.divider()
+                st.subheader("Validación cronológica")
+                st.caption("Cada predicción usa únicamente partidos anteriores; excluye encuentros empatados de la métrica ML. Se requiere suficiente historial por equipo.")
+                if st.button("Ejecutar backtesting", type="primary"):
+                    with st.spinner("Validando predicciones pasadas..."):
+                        results = backtest(history)
+                    if results.empty:
+                        st.warning("No hay suficientes juegos históricos por equipo para validar. Sube más temporadas o partidos.")
+                    else:
+                        st.metric("Juegos evaluados", len(results))
+                        st.metric("Brier score (menor es mejor)", f"{results.brier.mean():.3f}")
+                        st.metric("Error absoluto del total", f"{(results.predicted_total-results.actual_total).abs().mean():.1f} puntos")
+                        st.dataframe(results, hide_index=True, use_container_width=True)
+                        st.caption("Sin comparación contra cuotas de cierre ni benchmark de mercado. Un buen Brier en una muestra pequeña no garantiza rentabilidad.")
+        except (ValueError, KeyError, pd.errors.ParserError) as exc:
+            st.error(f"Error al procesar el archivo: {exc}")
+
 elif section == "Analizador EV":
     st.subheader("Valor esperado y exposición")
     x,y,z = st.columns(3)
@@ -171,7 +228,7 @@ else:
         {"Componente":"Marcadores NFL/NCAAF (ESPN público)","Estado":"Integrado (no oficial; requiere verificación)"},
         {"Componente":"Estadísticas avanzadas / lesiones","Estado":"Pendiente"},
         {"Componente":"Feed de cuotas Caliente","Estado":"Pendiente / sujeto a acceso permitido"},
-        {"Componente":"Entrenamiento histórico + backtesting","Estado":"Pendiente"},
+        {"Componente":"Modelo histórico CSV + backtesting cronológico","Estado":"Baseline experimental implementado; sin validación externa"},
         {"Componente":"Despliegue público","Estado":"Render activo"},
     ]), hide_index=True, use_container_width=True)
     st.caption("No almacenar credenciales en el repositorio. Usar secretos del proveedor de hosting.")
