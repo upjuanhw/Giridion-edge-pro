@@ -1,4 +1,6 @@
 import io
+import requests
+from datetime import date, timedelta
 import math
 import numpy as np
 import pandas as pd
@@ -21,19 +23,45 @@ with st.sidebar:
     st.title("🏈 GRIDIRON EDGE")
     st.caption("PRO • NFL / NCAA")
     league = st.radio("Liga", ["NFL", "NCAAF"], horizontal=True)
-    section = st.radio("Panel", ["Resumen", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
+    section = st.radio("Panel", ["Resumen", "Partidos y resultados", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"])
     st.divider()
-    st.caption("Versión beta • Datos no conectados en tiempo real")
+    st.caption("Versión beta • Marcadores ESPN (fuente pública no oficial); momios no conectados")
 
 st.title("Gridiron Edge Pro")
 st.caption(f"{league}  /  Análisis cuantitativo  /  Sin señales automáticas de apuestas")
-st.warning("Las cuotas y probabilidades deben verificarse. No hay conexión oficial a Caliente ni modelo entrenado con históricos validado.", icon="⚠️")
+st.warning("Las cuotas y probabilidades deben verificarse. Marcadores de ESPN disponibles como fuente pública no oficial; no hay conexión a Caliente ni modelo entrenado y validado.", icon="⚠️")
 
 def decimal_odds(american):
     return 1 + american/100 if american > 0 else 1 + 100/abs(american) if american < 0 else None
 
 def money(amt):
     return f"${amt:,.2f} MXN"
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_scoreboard(selected_league, day):
+    sport = "nfl" if selected_league == "NFL" else "college-football"
+    url = f"https://site.api.espn.com/apis/site/v2/sports/football/{sport}/scoreboard"
+    response = requests.get(url, params={"dates": day.strftime("%Y%m%d"), "limit": 500}, timeout=12,
+                            headers={"User-Agent": "GridironEdgePro/0.2"})
+    response.raise_for_status()
+    payload = response.json()
+    rows = []
+    for event in payload.get("events", []):
+        competition = (event.get("competitions") or [{}])[0]
+        competitors = competition.get("competitors", [])
+        home = next((c for c in competitors if c.get("homeAway") == "home"), {})
+        away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+        status = event.get("status", {}).get("type", {})
+        rows.append({
+            "Fecha (UTC)": event.get("date", ""),
+            "Visitante": away.get("team", {}).get("displayName", ""),
+            "Puntos visitante": away.get("score", "—"),
+            "Local": home.get("team", {}).get("displayName", ""),
+            "Puntos local": home.get("score", "—"),
+            "Estado": status.get("shortDetail", status.get("description", "")),
+            "ESPN": (event.get("links") or [{}])[0].get("web", {}).get("href", "")
+        })
+    return pd.DataFrame(rows)
 
 if section == "Resumen":
     a,b,c,d = st.columns(4)
@@ -45,6 +73,25 @@ if section == "Resumen":
     st.write("Analiza la probabilidad de equilibrio de cada momio, calcula valor esperado y simula marcadores con supuestos transparentes. Importa tus propias líneas en CSV.")
     st.info("Esta versión no emite picks calibrados ni simula acceso en tiempo real a casas de apuestas.")
 
+elif section == "Partidos y resultados":
+    st.subheader(f"Partidos y resultados • {league}")
+    st.caption("Fuente: marcador público de ESPN. Actualización de caché cada 5 minutos. No es un feed oficial contratado, puede cambiar o dejar de funcionar.")
+    day = st.date_input("Fecha de los partidos", value=date.today(), min_value=date(2020, 1, 1), max_value=date.today() + timedelta(days=365))
+    if st.button("Actualizar marcadores"):
+        fetch_scoreboard.clear()
+    try:
+        games = fetch_scoreboard(league, day)
+        if games.empty:
+            st.info("No se encontraron partidos para esa fecha. Prueba otro día.")
+        else:
+            st.metric("Partidos encontrados", len(games))
+            st.dataframe(games, hide_index=True, use_container_width=True,
+                         column_config={"ESPN": st.column_config.LinkColumn("Ficha ESPN", display_text="Ver partido")})
+        st.caption("Fechas mostradas en UTC. Los resultados no incluyen líneas de Caliente ni probabilidades calculadas.")
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        st.error("No se pudo consultar ESPN en este momento. Intenta de nuevo más tarde.")
+        st.caption(f"Detalle técnico: {type(exc).__name__}")
+        
 elif section == "Analizador EV":
     st.subheader("Valor esperado y exposición")
     x,y,z = st.columns(3)
@@ -121,9 +168,10 @@ else:
         {"Componente":"Cálculo EV","Estado":"Implementado"},
         {"Componente":"Monte Carlo exploratorio","Estado":"Implementado (sin calibración)"},
         {"Componente":"Importación manual de cuotas","Estado":"Implementado"},
-        {"Componente":"API estadísticas NFL/NCAAF","Estado":"Pendiente"},
+        {"Componente":"Marcadores NFL/NCAAF (ESPN público)","Estado":"Integrado (no oficial; requiere verificación)"},
+        {"Componente":"Estadísticas avanzadas / lesiones","Estado":"Pendiente"},
         {"Componente":"Feed de cuotas Caliente","Estado":"Pendiente / sujeto a acceso permitido"},
         {"Componente":"Entrenamiento histórico + backtesting","Estado":"Pendiente"},
-        {"Componente":"Despliegue público","Estado":"Pendiente de Streamlit"},
+        {"Componente":"Despliegue público","Estado":"Render activo"},
     ]), hide_index=True, use_container_width=True)
     st.caption("No almacenar credenciales en el repositorio. Usar secretos del proveedor de hosting.")
