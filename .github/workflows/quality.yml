@@ -16,5 +16,6 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: python -m compileall -q app.py historical_model.py season_data.py
+      - run: python -m compileall -q app.py historical_model.py season_data.py data_quality.py test_quality.py
+      - run: python -m unittest discover -p "test_*.py" -v
       - run: python -c "import historical_model, season_data"
