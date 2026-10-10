@@ -1,4 +1,5 @@
 import io
+import os
 import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
@@ -310,10 +311,7 @@ elif section == "Cuotas CSV":
     st.download_button("Descargar plantilla CSV", sample.to_csv(index=False).encode(), "plantilla_momios.csv", "text/csv")
     st.markdown("#### Momios publicados · NFL / NCAAF")
     st.caption("Proveedor independiente TheOddsAPI; las cuotas NO son de Caliente. Requiere clave de acceso y plan compatible.")
-    try:
-        provider_key = st.secrets.get("THEODDSAPI_KEY", "")
-    except (FileNotFoundError, KeyError):
-        provider_key = ""
+    provider_key = os.environ.get("THEODDSAPI_KEY", "")
     if provider_key:
         @st.cache_data(ttl=900, show_spinner=False)
         def provider_prices(selected_league, key):
