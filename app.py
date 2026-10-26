@@ -348,6 +348,8 @@ elif section == "Cuotas CSV":
     st.markdown("#### Momios publicados · NFL / NCAAF")
     st.caption("Proveedor independiente TheOddsAPI; las cuotas NO son de Caliente. Requiere clave de acceso y plan compatible.")
     provider_key = os.environ.get("THEODDSAPI_KEY", "")
+    if not provider_key:
+        provider_key = st.text_input("Clave The Odds API (opcional, solo en esta sesión)", type="password", key="odds_key_session")
     if provider_key:
         @st.cache_data(ttl=900, show_spinner=False)
         def provider_prices(selected_league, key):
