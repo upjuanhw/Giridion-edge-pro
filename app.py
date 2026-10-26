@@ -3,7 +3,7 @@ import os
 import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
-from live_model_dashboard import render as render_live_elo
+from live_model_dashboard import render as render_live_elo, load_recent, fit_elo, project, american_ev
 from data_quality import audit_games, is_clean
 from odds_provider import fetch_odds
 from datetime import date, timedelta
@@ -102,6 +102,20 @@ elif section == "Mercado de partidos":
     with b:
         if st.button("↻ Actualizar partidos", use_container_width=True):
             fetch_scoreboard.clear()
+    show_projections = st.toggle("Proyecciones Elo en cada partido", value=True, key=f"inline_elo_{league}")
+    elo_state = None
+    if show_projections:
+        try:
+            with st.spinner("Cargando historial de 2025–2026..."):
+                history, missing = load_recent(league, date.today().year)
+            history = history[pd.to_datetime(history["date"], utc=True, errors="coerce").dt.date < day]
+            if not history.empty:
+                ratings, scored, conceded, counts = fit_elo(history)
+                elo_state = (ratings, scored, conceded, counts)
+            if missing:
+                st.warning(f"Histórico parcial: {missing} semanas sin datos.")
+        except Exception as exc:
+            st.warning(f"No se pudo cargar Elo ({type(exc).__name__}); la cartelera sigue disponible.")
     try:
         games = fetch_scoreboard(league, day)
         if games.empty:
@@ -131,6 +145,24 @@ elif section == "Mercado de partidos":
             for idx,game in games.iterrows():
                 with st.container(border=True):
                     st.markdown(f"**{game['Visitante']}**  @  **{game['Local']}**")
+                    if elo_state is not None:
+                        ratings, scored, conceded, counts = elo_state
+                        home_name, away_name = game["Local"], game["Visitante"]
+                        if counts[home_name] >= 4 and counts[away_name] >= 4:
+                            ph, margin, total, sample = project(home_name, away_name, ratings, scored, conceded, counts)
+                            e1,e2,e3 = st.columns(3)
+                            e1.metric("ML local · Elo", f"{ph:.1%}")
+                            e2.metric("Margen local", f"{margin:+.1f}")
+                            e3.metric("Total proyectado", f"{total:.1f}")
+                            with st.expander("Comparar moneyline con cuota real"):
+                                side = st.radio("Selección", ["Local", "Visitante"], horizontal=True, key=f"card_side_{league}_{idx}")
+                                odd = st.number_input("Momio americano", -10000, 10000, 200, 10, key=f"card_odds_{league}_{idx}")
+                                ev = american_ev(ph if side == "Local" else 1-ph, odd)
+                                if ev is not None:
+                                    st.metric("EV teórico", f"{ev:+.1%}")
+                                st.caption("Proyección experimental; no validada frente al mercado.")
+                        else:
+                            st.caption("Elo: historial insuficiente para uno o ambos equipos.")
                     c1,c2,c3 = st.columns([2,1,2])
                     with c1:
                         if str(game["Logo visitante"]).startswith("https://"):
