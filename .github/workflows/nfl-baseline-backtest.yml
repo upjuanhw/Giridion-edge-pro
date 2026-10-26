@@ -1,0 +1,31 @@
+name: NFL baseline backtest
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/nfl-baseline-backtest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install requests
+      - run: python scripts/download_nfl_history.py --start 2018 --end 2025 --output data/nfl_2018_2025.csv
+      - run: python scripts/download_nfl_history.py --start 2026 --end 2026 --output data/nfl_2026_completed.csv
+      - name: Backtest NFL baseline
+        run: python scripts/backtest_nfl_baseline.py --historical data/nfl_2018_2025.csv --current data/nfl_2026_completed.csv --output data/nfl_baseline_backtest.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nfl-baseline-backtest
+          path: |
+            data/nfl_baseline_backtest.csv
+          retention-days: 30
