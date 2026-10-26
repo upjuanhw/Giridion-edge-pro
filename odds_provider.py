@@ -10,9 +10,9 @@ def fetch_odds(league, api_key):
         raise ValueError("Unsupported league")
     if not api_key:
         raise ValueError("Missing API key")
-    response = requests.get("https://api.theoddsapi.com/odds/",
-                            params={"sport_key": SPORTS[league], "markets": "h2h,spreads,totals",
-                                    "regions": "us", "oddsFormat": "american"},
+    response = requests.get("https://api.the-odds-api.com/v4/sports/{SPORTS[league]}/odds/",
+                            params={"markets": "h2h,spreads,totals",
+                                    "regions": "us", "oddsFormat": "american", "apiKey": api_key},
                             headers={"x-api-key": api_key}, timeout=15)
     response.raise_for_status()
     rows = []
