@@ -1,0 +1,29 @@
+name: NCAAF historical Elo backtest
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install requests
+      - name: Download 2018-2025
+        run: python scripts/download_ncaaf_history.py --start 2018 --end 2025 --output data/ncaaf_games.csv
+      - name: Run chronological Elo baseline
+        run: python scripts/backtest_ncaaf_elo.py --input data/ncaaf_games.csv --output data/ncaaf_elo_backtest.csv
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncaaf-elo-backtest
+          path: |
+            data/ncaaf_games.csv
+            data/ncaaf_elo_backtest.csv
+          retention-days: 30
