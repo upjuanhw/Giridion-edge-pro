@@ -3,6 +3,7 @@ import os
 import requests
 from historical_model import clean_games, predict, backtest
 from season_data import fetch_season
+from live_model_dashboard import render as render_live_elo
 from data_quality import audit_games, is_clean
 from odds_provider import fetch_odds
 from datetime import date, timedelta
@@ -44,9 +45,9 @@ with st.sidebar:
 
 # Mobile-first navigation: always visible, with games as the default.
 league = st.segmented_control("Liga", ["NFL", "NCAAF"], default="NFL", key="league_top")
-labels = ["Partidos", "Modelo", "EV", "Monte Carlo", "Cuotas", "Configuración"]
+labels = ["Partidos", "Elo 2026", "Modelo", "EV", "Monte Carlo", "Cuotas", "Configuración"]
 selection = st.selectbox("Vista", labels, index=0, key="view_top")
-section = dict(zip(labels, ["Mercado de partidos", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"]))[selection]
+section = dict(zip(labels, ["Mercado de partidos", "Elo 2026", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"]))[selection]
 st.markdown(f"""<div class="edge-hero"><div class="edge-kicker">GRIDIRON EDGE PRO / {league}</div>
 <div class="edge-headline">Football Market Terminal</div>
 <div class="edge-sub">Partidos · Estadística · Modelos · Valor esperado</div></div>""",unsafe_allow_html=True)
@@ -90,7 +91,10 @@ def fetch_scoreboard(selected_league, day):
         })
     return pd.DataFrame(rows)
 
-if section == "Mercado de partidos":
+if section == "Elo 2026":
+    render_live_elo(league, fetch_scoreboard)
+
+elif section == "Mercado de partidos":
     st.caption("Marcadores ESPN · caché 5 min · Cuotas Caliente pendientes")
     a,b = st.columns([2,1])
     with a:
