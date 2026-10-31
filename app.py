@@ -6,6 +6,7 @@ from season_data import fetch_season
 from live_model_dashboard import render as render_live_elo, load_recent, fit_elo, project, american_ev
 from data_quality import audit_games, is_clean
 from odds_provider import fetch_odds
+from market_math import implied_probability, no_vig_probabilities, expected_value
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 import math
@@ -45,9 +46,9 @@ with st.sidebar:
 
 # Mobile-first navigation: always visible, with games as the default.
 league = st.segmented_control("Liga", ["NFL", "NCAAF"], default="NFL", key="league_top")
-labels = ["Partidos", "Elo 2026", "Modelo", "EV", "Monte Carlo", "Cuotas", "Configuración"]
+labels = ["Partidos", "Elo 2026", "Modelo", "EV", "Monte Carlo", "Cuotas", "Comparador", "Configuración"]
 selection = st.selectbox("Vista", labels, index=0, key="view_top")
-section = dict(zip(labels, ["Mercado de partidos", "Elo 2026", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Estado del sistema"]))[selection]
+section = dict(zip(labels, ["Mercado de partidos", "Elo 2026", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Comparador de mercado", "Estado del sistema"]))[selection]
 st.markdown(f"""<div class="edge-hero"><div class="edge-kicker">GRIDIRON EDGE PRO / {league}</div>
 <div class="edge-headline">Football Market Terminal</div>
 <div class="edge-sub">Partidos · Estadística · Modelos · Valor esperado</div></div>""",unsafe_allow_html=True)
@@ -91,7 +92,33 @@ def fetch_scoreboard(selected_league, day):
         })
     return pd.DataFrame(rows)
 
-if section == "Elo 2026":
+if section == "Comparador de mercado":
+    st.subheader("Comparador de mercado · ML")
+    st.caption("Momios introducidos manualmente; NO son cuotas en vivo. Modelo y mercado deben corresponder al mismo partido y momento.")
+    c1, c2 = st.columns(2)
+    with c1:
+        home_odds = st.number_input("Momio ML local (americano)", value=-110, step=5, key="compare_home")
+    with c2:
+        away_odds = st.number_input("Momio ML visitante (americano)", value=-110, step=5, key="compare_away")
+    probability_pct = st.slider("Probabilidad estimada de victoria local (%)", 0.0, 100.0, 50.0, 0.5, key="compare_probability")
+    try:
+        market = no_vig_probabilities([home_odds, away_odds])
+        estimate = probability_pct / 100
+        results = pd.DataFrame([
+            {"Selección": "Local", "Momio": home_odds, "Prob. implícita": implied_probability(home_odds),
+             "Mercado sin margen": market[0], "Modelo": estimate, "EV por unidad": expected_value(estimate, home_odds)},
+            {"Selección": "Visitante", "Momio": away_odds, "Prob. implícita": implied_probability(away_odds),
+             "Mercado sin margen": market[1], "Modelo": 1-estimate, "EV por unidad": expected_value(1-estimate, away_odds)},
+        ])
+        st.dataframe(results.style.format({"Prob. implícita": "{:.1%}", "Mercado sin margen": "{:.1%}",
+                                           "Modelo": "{:.1%}", "EV por unidad": "{:+.1%}"}),
+                     hide_index=True, use_container_width=True)
+        st.metric("Margen implícito de la casa", f"{(implied_probability(home_odds) + implied_probability(away_odds) - 1):+.2%}")
+        st.warning("EV teórico, no validado. La estimación introducida puede estar mal calibrada; no implica ventaja comprobada.")
+    except ValueError as exc:
+        st.error(f"Momios inválidos: {exc}")
+
+elif section == "Elo 2026":
     render_live_elo(league, fetch_scoreboard)
 
 elif section == "Mercado de partidos":
