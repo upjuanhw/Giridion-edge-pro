@@ -13,6 +13,7 @@ import math
 import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit_panel import render_expert_signals
 
 st.set_page_config(page_title="Gridiron Edge Pro", page_icon="🏈", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""
@@ -46,9 +47,9 @@ with st.sidebar:
 
 # Mobile-first navigation: always visible, with games as the default.
 league = st.segmented_control("Liga", ["NFL", "NCAAF"], default="NFL", key="league_top")
-labels = ["Partidos", "Elo 2026", "Modelo", "EV", "Monte Carlo", "Cuotas", "Comparador", "Configuración"]
+labels = ["Partidos", "Elo 2026", "Modelo", "EV", "Monte Carlo", "Cuotas", "Comparador", "Expertos NFL", "Configuración"]
 selection = st.selectbox("Vista", labels, index=0, key="view_top")
-section = dict(zip(labels, ["Mercado de partidos", "Elo 2026", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Comparador de mercado", "Estado del sistema"]))[selection]
+section = dict(zip(labels, ["Mercado de partidos", "Elo 2026", "Modelo histórico", "Analizador EV", "Monte Carlo", "Cuotas CSV", "Comparador de mercado", "Expertos NFL", "Estado del sistema"]))[selection]
 st.markdown(f"""<div class="edge-hero"><div class="edge-kicker">GRIDIRON EDGE PRO / {league}</div>
 <div class="edge-headline">Football Market Terminal</div>
 <div class="edge-sub">Partidos · Estadística · Modelos · Valor esperado</div></div>""",unsafe_allow_html=True)
@@ -117,6 +118,12 @@ if section == "Comparador de mercado":
         st.warning("EV teórico, no validado. La estimación introducida puede estar mal calibrada; no implica ventaja comprobada.")
     except ValueError as exc:
         st.error(f"Momios inválidos: {exc}")
+
+elif section == "Expertos NFL":
+    if league == "NFL":
+        render_expert_signals()
+    else:
+        st.info("El panel de expertos está disponible únicamente para NFL.")
 
 elif section == "Elo 2026":
     render_live_elo(league, fetch_scoreboard)
